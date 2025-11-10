@@ -12,6 +12,12 @@ use serde::Deserialize;
 
 use bootc_utils::CommandRunExt;
 
+/// EFI System Partition (ESP) on MBR
+pub const ESP_ID_MBR: &[&str] = &["6", "ef"];
+
+/// EFI System Partition (ESP) for UEFI boot on GPT
+pub const ESP_ID_GPT: &str = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b";
+
 #[derive(Debug, Deserialize)]
 struct DevicesOutput {
     blockdevices: Vec<Device>,
@@ -174,6 +180,20 @@ impl PartitionTable {
     /// Find the partition with bootable is 'true'.
     pub fn find_partition_of_bootable(&self) -> Option<&Partition> {
         self.partitions.iter().find(|p| p.is_bootable())
+    }
+
+    /// Find the esp partition.
+    pub fn find_partition_of_esp(&self) -> Result<Option<&Partition>> {
+        match &self.label {
+            PartitionType::Dos => Ok(ESP_ID_MBR
+                .iter()
+                .find_map(|&t| self.partitions.iter().find(|p| p.parttype_matches(t)))),
+            PartitionType::Gpt => Ok(self
+                .partitions
+                .iter()
+                .find(|p| p.parttype_matches(ESP_ID_GPT))),
+            _ => Err(anyhow::anyhow!("Unsupported partition table type")),
+        }
     }
 }
 
@@ -612,6 +632,10 @@ mod test {
             .find_partition_of_type("00000000-0000-0000-0000-000000000000");
         assert!(nonexistent.is_none());
 
+        // Find esp partition on gpt
+        let esp = table.partitiontable.find_partition_of_esp()?.unwrap();
+        assert_eq!(esp.node, "/dev/loop0p1");
+
         Ok(())
     }
     #[test]
@@ -636,11 +660,6 @@ mod test {
                         "start": 1028096,
                         "size": 2097152,
                         "type": "83"
-                    },{
-                        "node": "/dev/mmcblk0p3",
-                        "start": 3125248,
-                        "size": 121610240,
-                        "type": "83"
                     }
                 ]
             }
@@ -655,6 +674,9 @@ mod test {
             .find_partition_of_bootable()
             .expect("bootable partition not found");
         assert_eq!(esp.node, "/dev/mmcblk0p1");
+
+        let esp1 = table.partitiontable.find_partition_of_esp()?.unwrap();
+        assert_eq!(esp1.node, "/dev/mmcblk0p1");
         Ok(())
     }
 }
