@@ -1,0 +1,8 @@
+/test-bootc-install-on-ostree:
+  summary: Test bootc install on ostree
+  duration: 30m
+  adjust:
+  - when: running_env != existing-ostree
+    enabled: false
+    because: this needs to start an ostree OS firstly
+  test: bash examples/test-on-ostree/test-install-on-ostree.sh

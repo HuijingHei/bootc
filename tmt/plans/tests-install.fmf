@@ -1,0 +1,20 @@
+discover:
+  how: fmf
+provision:
+  how: virtual
+  hardware:
+    boot:
+      method: uefi
+  image: fedora-coreos-next
+  user: root
+  memory: 4096
+  disk: 20
+execute:
+  how: tmt
+
+/plan-bootc-install-on-ostree:
+  summary: Execute bootc install on ostree tests
+  discover:
+    how: fmf
+    test:
+      - /tmt/tests/install/test-bootc-install-on-ostree
