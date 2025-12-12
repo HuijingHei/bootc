@@ -260,7 +260,7 @@ pub(crate) fn run_tmt(sh: &Shell, args: &RunTmtArgs) -> Result<()> {
 
     // Get the list of plans
     println!("Discovering test plans...");
-    let plans_output = cmd!(sh, "tmt plan ls")
+    let plans_output = cmd!(sh, "tmt plan ls /tmt/plans/integration")
         .read()
         .context("Getting list of test plans")?;
 

@@ -1,0 +1,24 @@
+discover:
+  how: fmf
+execute:
+  how: tmt
+
+/plan-bootc-install-on-ostree:
+  summary: Execute bootc install on ostree tests
+  adjust:
+  - when: running_env != existing-ostree
+    enabled: false
+    because: this needs to start an ostree OS firstly
+  provision:
+    how: virtual
+    hardware:
+      boot:
+        method: uefi
+    image: fedora-coreos-next
+    user: root
+    memory: 4096
+    disk: 20
+  discover:
+    how: fmf
+    test:
+      - /tmt/tests/install/test-bootc-install-on-ostree

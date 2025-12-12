@@ -106,6 +106,7 @@ jobs:
           sudo find /ostree/repo/objects -name '*.file' -type f | while read f; do
             sudo fsverity measure $f >/dev/null
           done
+
   # Test that we can build documentation
   docs:
     runs-on: ubuntu-24.04
@@ -211,6 +212,54 @@ jobs:
         with:
           name: tmt-log-PR-${{ github.event.number }}-${{ matrix.test_os }}-${{ matrix.variant }}-${{ env.ARCH }}
           path: /var/tmp/tmt
+
+  test-install-on-ostree:
+    strategy:
+      fail-fast: false
+      matrix:
+        test_os: [fedora-43]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install butane
+        run: |
+          set -xeuo pipefail
+          export BUTANE_VERSION=0.25.1
+          td=$(mktemp -d)
+          cd $td
+          # Install butane
+          target=butane-$(arch)-unknown-linux-gnu
+          /bin/time -f '%E %C' curl -LO https://github.com/coreos/butane/releases/download/v${BUTANE_VERSION}/${target}
+          sudo install -T ${target} /usr/bin/butane
+          cd - && rm -rf "$td"
+          butane --version
+      - name: Install utils
+        run: sudo apt -y install just
+      - name: Bootc Ubuntu Setup
+        uses: ./.github/actions/bootc-ubuntu-setup
+        with:
+          libvirt: true
+      - name: Install tmt
+        run: pip install --user "tmt[provision-virtual]"
+      - name: Setup env
+        run: |
+          BASE=$(just pullspec-for-os base ${{ matrix.test_os }})
+          echo "BOOTC_base=${BASE}" >> $GITHUB_ENV
+
+      # Test on fedora-coreos-next with install fedora-bootc:43 derived image
+      # Can not test uefi because of https://github.com/teemtee/tmt/issues/4203
+      - name: "Test install on ostree"
+        run: |
+          podman image prune -f
+          just build
+          podman image exists localhost/bootc
+          (cd hack && podman build -t localhost/bootc-test -f Containerfile.derived)
+          podman image exists localhost/bootc-test && \
+          podman save -q localhost/bootc-test:latest -o tmt/tests/examples/bootc-test.tar
+          tmt --context running_env=existing-ostree run plans -n /tmt/plans/tests-install/plan-bootc-install-on-ostree --debug
+          rm -f tmt/tests/examples/bootc-test.tar
+          podman rmi localhost/bootc{,-bin,-test} -f
 
   # Sentinel job for required checks - configure this job name in repository settings
   required-checks:
